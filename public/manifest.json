@@ -1,0 +1,16 @@
+{
+  "name": "mwcrea Form Service",
+  "short_name": "mwcrea Forms",
+  "description": "Centralized form management microservice",
+  "start_url": "/admin",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

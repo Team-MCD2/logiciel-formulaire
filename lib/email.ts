@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { render } from '@react-email/render';
+import { render } from 'react-email';
 import * as React from 'react';
 import LeadNotificationEmail from '@/emails/LeadNotification';
 import AutoReplyEmail from '@/emails/AutoReply';
