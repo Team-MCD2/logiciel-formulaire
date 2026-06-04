@@ -16,9 +16,30 @@ export async function GET(request: NextRequest) {
 
   try {
     const challengeData = await generateChallenge(ipAddress);
-    return NextResponse.json(challengeData);
+    return NextResponse.json(challengeData, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
   } catch (error) {
     console.error('Error generating PoW challenge:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { 
+      status: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
 }
