@@ -278,4 +278,5 @@ This project was recently upgraded to V2 to ensure it operates at a Senior Devel
    - *Expected Result:* The statistics cards will fade in sequentially (`BlurFade`), and the numbers will count up dynamically (`NumberTicker`). Open a form's details page to see the `BorderBeam` highlight the integration code on hover.
 
 #   l o g i c i e l - f o r m u l a i r e  
+ #   l o g i c i e l - f o r m u l a i r e  
  
