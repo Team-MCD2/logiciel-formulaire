@@ -462,8 +462,21 @@ export async function POST(
   delete cleanPayload.lang;
 
   // 4b. Keyword Spam Filter Check
+  // IMPORTANT: Only scan actual user-typed text fields, NOT binary data.
+  // Base64 photo blobs (300KB+) statistically guarantee false positives
+  // for short keywords like "seo" due to random character sequences.
   const SPAM_KEYWORDS = ['seo', 'crypto', 'viagra', 'enlarge', 'casino', 'bitcoin', 'investment'];
-  const payloadString = JSON.stringify(cleanPayload).toLowerCase();
+  const textOnlyPayload: Record<string, string> = {};
+  for (const [key, value] of Object.entries(cleanPayload)) {
+    if (
+      typeof value === 'string' &&
+      !value.startsWith('data:') &&       // Exclude Base64 data URIs
+      value.length < 5000                  // Exclude any abnormally long blob
+    ) {
+      textOnlyPayload[key] = value;
+    }
+  }
+  const payloadString = JSON.stringify(textOnlyPayload).toLowerCase();
   const isSpam = SPAM_KEYWORDS.some(keyword => payloadString.includes(keyword));
   
   if (isSpam) {
