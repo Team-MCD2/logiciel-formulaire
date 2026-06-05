@@ -13,6 +13,45 @@ import {
   Text,
 } from 'react-email';
 
+const FRENCH_LABELS: Record<string, string> = {
+  nom: 'Nom',
+  email: 'Email',
+  telephone: 'Téléphone',
+  phone: 'Téléphone',
+  message: 'Message',
+  subject: 'Sujet',
+  sujet: 'Sujet',
+  audience: 'Audience',
+  marque: 'Marque',
+  modele: 'Modèle',
+  annee: 'Année',
+  motorisation: 'Motorisation',
+  photos_count: 'Nombre de photos',
+  photo_1_data: 'Photo 1',
+  photo_2_data: 'Photo 2',
+  photo_3_data: 'Photo 3',
+  photo_4_data: 'Photo 4',
+  photo_5_data: 'Photo 5',
+  sent_at: "Date d'envoi",
+  ip_address: 'Adresse IP',
+  'ip address': 'Adresse IP',
+};
+
+const getFrenchLabel = (key: string): string => {
+  const normalizedKey = key.toLowerCase().trim();
+  if (FRENCH_LABELS[normalizedKey]) {
+    return FRENCH_LABELS[normalizedKey];
+  }
+  
+  // Try mapping dynamic photo names: e.g. photo_1_data or photo1data or photo1
+  const photoMatch = normalizedKey.match(/^photo_?(\d+)(_?data)?$/);
+  if (photoMatch) {
+    return `Photo ${photoMatch[1]}`;
+  }
+  
+  return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
 interface LeadNotificationProps {
   clientName: string;
   formName: string;
@@ -61,10 +100,19 @@ export const LeadNotificationEmail = ({
 
             <Section style={{ backgroundColor: '#f9fbfd', padding: '16px', borderRadius: '8px' }}>
               {Object.entries(payload).map(([key, value]) => {
-                // Formatting keys nicely (e.g., "first_name" -> "First Name")
-                const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                const formattedKey = getFrenchLabel(key);
                 
-                const valStr = String(value);
+                let valStr = String(value);
+                // Try parsing dates for the sent_at key
+                if (key.toLowerCase().trim() === 'sent_at' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(valStr)) {
+                  try {
+                    const date = new Date(valStr);
+                    if (!isNaN(date.getTime())) {
+                      valStr = date.toLocaleString('fr-FR', { timeZone: 'Europe/Paris' });
+                    }
+                  } catch (_) {}
+                }
+                
                 const isUrl = valStr.startsWith('http') && (valStr.includes('supabase.co/storage') || valStr.includes('uploads/'));
                 
                 return (
