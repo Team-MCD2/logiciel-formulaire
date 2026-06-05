@@ -159,7 +159,7 @@ Pour soumettre des données à un formulaire, récupérez son ID (UUID) depuis l
 
 ### Option A : Formulaire HTML Standard (Sans JS / Secours)
 ```html
-<form action="http://localhost:3000/api/submit/VOTRE-UUID-DU-FORMULAIRE" method="POST">
+<form action="https://logiciel-formulaire.vercel.app/api/submit/VOTRE-UUID-DU-FORMULAIRE" method="POST">
   <!-- Piège anti-spam Honeypot (Caché aux utilisateurs) -->
   <input type="text" name="_gotcha" style="display:none !important" tabindex="-1" autocomplete="off" />
 
