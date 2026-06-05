@@ -12,6 +12,9 @@ interface Client {
   name: string;
   email: string;
   phone: string | null;
+  logo_url?: string;
+  primary_color?: string;
+  font_family?: string;
   created_at: string;
 }
 
@@ -27,6 +30,9 @@ export default function ClientsPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [primaryColor, setPrimaryColor] = useState('#000000');
+  const [fontFamily, setFontFamily] = useState('sans-serif');
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -50,6 +56,9 @@ export default function ClientsPage() {
     setName('');
     setEmail('');
     setPhone('');
+    setLogoUrl('');
+    setPrimaryColor('#000000');
+    setFontFamily('sans-serif');
     setFormError('');
     setModalOpen(true);
   };
@@ -59,6 +68,9 @@ export default function ClientsPage() {
     setName(client.name);
     setEmail(client.email);
     setPhone(client.phone || '');
+    setLogoUrl(client.logo_url || '');
+    setPrimaryColor(client.primary_color || '#000000');
+    setFontFamily(client.font_family || 'sans-serif');
     setFormError('');
     setModalOpen(true);
   };
@@ -74,7 +86,15 @@ export default function ClientsPage() {
     setFormError('');
 
     try {
-      const res = await saveClient(editClient ? editClient.id : null, name, email, phone);
+      const res = await saveClient(
+        editClient ? editClient.id : null, 
+        name, 
+        email, 
+        phone,
+        logoUrl || null,
+        primaryColor || '#000000',
+        fontFamily || 'sans-serif'
+      );
       if (res && !res.success) {
         setFormError(res.error || 'Impossible de sauvegarder le client.');
         return;
@@ -136,9 +156,21 @@ export default function ClientsPage() {
           </div>
         ) : (
           clients.map((client) => (
-            <div key={client.id} className="rounded-2xl border border-slate-100 bg-white p-6 shadow-xs flex flex-col justify-between h-48">
+            <div key={client.id} className="rounded-2xl border border-slate-100 bg-white p-6 shadow-xs flex flex-col justify-between h-56">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">{client.name}</h3>
+                <div className="flex items-center gap-3 mb-2">
+                  {client.logo_url ? (
+                    <img src={client.logo_url} alt="Logo" className="h-8 w-8 object-contain rounded" />
+                  ) : (
+                    <div 
+                      className="h-8 w-8 rounded flex items-center justify-center text-white font-bold text-sm"
+                      style={{ backgroundColor: client.primary_color || '#000000' }}
+                    >
+                      {client.name.charAt(0)}
+                    </div>
+                  )}
+                  <h3 className="font-bold text-slate-900 text-base truncate">{client.name}</h3>
+                </div>
                 <p className="text-sm text-slate-500 mt-2 truncate">{client.email}</p>
                 {client.phone && <p className="text-xs text-slate-400 mt-1 font-medium">{client.phone}</p>}
               </div>
@@ -209,6 +241,60 @@ export default function ClientsPage() {
               onChange={e => setPhone(e.target.value)}
               disabled={saving}
             />
+          </div>
+
+          <div className="pt-4 border-t border-slate-100">
+            <h4 className="text-sm font-bold text-slate-900 mb-4">Direction Artistique (Emails)</h4>
+            
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">URL du Logo</label>
+                <Input 
+                  type="url" 
+                  placeholder="https://.../logo.png" 
+                  value={logoUrl} 
+                  onChange={e => setLogoUrl(e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Couleur Principale</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="color" 
+                      value={primaryColor} 
+                      onChange={e => setPrimaryColor(e.target.value)}
+                      disabled={saving}
+                      className="h-9 w-12 cursor-pointer rounded bg-transparent border-0 p-0"
+                    />
+                    <Input 
+                      type="text" 
+                      value={primaryColor} 
+                      onChange={e => setPrimaryColor(e.target.value)}
+                      placeholder="#000000"
+                      disabled={saving}
+                      className="font-mono text-xs uppercase"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Police de caractères</label>
+                  <select
+                    value={fontFamily}
+                    onChange={e => setFontFamily(e.target.value)}
+                    disabled={saving}
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="sans-serif">Sans-serif (Défaut)</option>
+                    <option value="serif">Serif (Classique)</option>
+                    <option value="monospace">Monospace (Code)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">

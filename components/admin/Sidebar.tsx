@@ -13,6 +13,7 @@ export function Sidebar() {
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Formulaires', href: '/admin/forms', icon: FileText },
     { name: 'Clients', href: '/admin/clients', icon: Users },
+    { name: 'Logs & Échecs', href: '/admin/logs', icon: ShieldAlert },
     { name: 'Blacklist', href: '/admin/blacklist', icon: ShieldAlert },
   ];
 

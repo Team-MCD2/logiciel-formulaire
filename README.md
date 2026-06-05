@@ -1,181 +1,170 @@
-# Centralized Form Microservice (mwcrea Forms)
+# Microservice de Formulaires Centralisé (mwcrea Forms)
 
-An open-source, self-hosted alternative to Jotform, Formspree, and EmailJS. 
-This microservice lets you centralize form submissions from all your marketing websites (villas, agencies, client showcases) into a single dashboard, sending email notifications to clients and automatic auto-replies to submitters.
-
----
-
-## ⚡ V2 Migration & Quick Start Resume
-This system has been upgraded to V2, featuring React Email dynamic branding, top-tier error handling with remedies, and a Magic UI animated dashboard.
-
-**Quick Setup Steps:**
-1. **[Database Setup](#1-database-setup-supabase)**: Run `schema.sql`, `migration_auto_reply.sql`, and the new **`migration_v2_branding.sql`** to support client logos and colors.
-2. **[SMTP Configuration](#-smtp-provider-setup-guide-resend-vs-brevo)**: Set up Brevo/Resend. (Disable IP Blocking in Brevo to prevent `525 5.7.1` errors).
-3. **[Environment Variables](#2-environment-variables-configuration)**: Configure `.env.local` with Supabase, JWT, and SMTP credentials.
-4. **[Frontend Integration & Error Handling](#-frontend-integration-guide)**: Connect via HTML or AJAX. The API now returns detailed JSON error objects with `remedy` instructions for easy debugging.
+Une alternative open-source et auto-hébergée à Jotform, Formspree et EmailJS. 
+Ce microservice vous permet de centraliser les soumissions de formulaires de tous vos sites web marketing (villas, agences, vitrines clients) dans un tableau de bord unique, en envoyant des notifications par email aux clients et des accusés de réception automatiques aux expéditeurs.
 
 ---
 
-## 🚀 Key Features
+## ⚡ Résumé de la Migration V3 & Démarrage Rapide
+Ce système est désormais en **V3**, intégrant un moteur avancé de logs en direct (Live Failure Logs), un filtre anti-spam par mots-clés, des redirections sécurisées en base de données, l'exportation CSV des leads, et des variables dynamiques (`{{name}}`) dans les auto-répondeurs.
 
-*   **Centralized Administration Panel (`/admin`)**: Create forms, link them to specific clients, view submissions, download leads, and toggle auto-replies.
-*   **Dynamic CORS Validation**: Forms only accept submissions from allowed domains configured in the dashboard (supports wildcard `*`).
-*   **Next-Gen Security & Anti-Spam**:
-    *   **Proof-of-Work (PoW)**: AJAX submissions must solve a cryptographic CPU challenge, completely blocking automated API spam.
-    *   **Active Honeypot (`_gotcha`)**: Submissions with the honey trap filled instantly ban the sender's IP/Fingerprint.
-    *   **Reverse DNS VPN Block**: Automatic background reverse lookups blacklisting hosting providers (AWS, DigitalOcean, OVH, etc.).
-    *   **Anti-Scraping / DevTools Blocker**: Protection scripts that disable Right-Click, F12, developer shortcuts, and freeze the browser tab if developer tools are opened.
-*   **Automatic SMTP Fallback Rotation**: Never lose a lead. If your main SMTP email credentials fail, the mailer rotates through your backup passwords until success.
-*   **Multilingual Auto-Reply**: Sends styled confirmation emails to form submitters in their preferred language (`fr` or `en`) based on the form locale.
+**Étapes de Configuration Rapide :**
+1. **[Configuration de la Base de Données](#1-configuration-de-la-base-de-données-supabase)** : Exécutez `schema.sql`, `migration_auto_reply.sql`, `migration_v2_branding.sql` et **`migration_v3.sql`**. Créez un bucket public nommé `uploads` dans Storage.
+2. **[Configuration SMTP](#-guide-de-configuration-du-fournisseur-smtp-resend-vs-brevo)** : Configurez Brevo/Resend. (Désactivez le blocage d'IP dans Brevo pour éviter l'erreur `525 5.7.1`).
+3. **[Variables d'Environnement](#2-configuration-des-variables-denvironnement)** : Configurez `.env.local` avec les identifiants Supabase, JWT et SMTP.
+4. **[Intégration Frontend & Gestion des Erreurs](#-guide-dintégration-frontend)** : Connectez-vous via HTML ou AJAX. L'API retourne désormais des objets d'erreur JSON détaillés avec des instructions `remedy` pour un débogage facile.
 
 ---
 
-## 🛠️ Tech Stack
+## 🚀 Fonctionnalités Principales
 
-*   **Frontend & Admin Dashboard**: Next.js (App Router), Tailwind CSS.
-*   **Backend & DB**: Supabase (PostgreSQL), NextJS Route Handlers (Edge & Node runtime compatible).
-*   **Email Engine**: Nodemailer (SMTP) with automatic credential rotation.
+*   **Panneau d'Administration Centralisé (`/admin`)** : Créez des formulaires, liez-les à des clients spécifiques, consultez les soumissions, et exportez facilement vos leads grâce au bouton **Exporter en CSV**.
+*   **Logs d'Échecs en Direct (Live Logs)** : Interface dédiée avec "Mode Live" par polling pour surveiller en temps réel les rejets de spam et les pannes SMTP.
+*   **Emails Dynamiques en Marque Blanche** : Les emails s'adaptent nativement à la marque du client assigné (Logos, Couleurs, Polices).
+*   **Accusé de Réception Dynamique** : Envoie des confirmations stylisées (en `fr` ou `en`). Utilisez `{{name}}` ou `{{nom}}` dans votre message personnalisé pour que le système injecte automatiquement le prénom de l'expéditeur !
+*   **Gestion Intelligente des Pièces Jointes** : Uploade les fichiers Base64 massifs directement sur Supabase Storage et injecte des liens de téléchargement propres dans les emails.
+*   **Sécurité Next-Gen & Anti-Spam (V3)** :
+    *   **Filtre Anti-Spam NLP** : Bloque automatiquement et silencieusement les soumissions contenant des mots-clés de spam (ex: "crypto", "seo", "casino") et les journalise dans le panel Live Logs.
+    *   **Redirection Sécurisée en Base de Données** : Force l'URL de succès (`success_url`) depuis le backend, empêchant toute manipulation malveillante via le frontend.
+    *   **Validation CORS Dynamique** : Les formulaires n'acceptent que les soumissions provenant des domaines autorisés.
+    *   **Preuve de Travail (PoW) & Pot de Miel (`_gotcha`)** : Défis cryptographiques CPU et pièges cachés pour bannir instantanément les bots (IP/Empreinte).
+    *   **Blocage VPN par Reverse DNS** : Recherches inversées automatiques pour blacklister l'hébergement cloud.
+*   **Rotation Automatique de Secours SMTP** : Bascule sur des mots de passe de secours si les identifiants principaux échouent, garantissant l'envoi du lead.
 
 ---
 
-## 📁 Project Structure
+## 🛠️ Stack Technique
+
+*   **Frontend & Tableau de bord Admin** : Next.js (App Router), Tailwind CSS.
+*   **Backend & DB** : Supabase (PostgreSQL), NextJS Route Handlers (Compatible Edge & Node).
+*   **Moteur d'Emails** : Nodemailer (SMTP) avec rotation automatique des identifiants et `@react-email`.
+
+---
+
+## 📁 Structure du Projet
 
 ```text
 ├── app/
-│   ├── admin/             # Secured administration panel (Dashboard, Forms, Clients, Submissions)
+│   ├── admin/             # Panneau d'administration sécurisé (Dashboard, Formulaires, Clients, Soumissions)
 │   ├── api/
-│   │   ├── auth/          # Custom JWT-based authentication handlers
-│   │   ├── challenge/     # Proof-of-Work cryptographic challenge generator
-│   │   └── submit/[id]/   # Dynamic submission endpoint (handles JSON fetch & urlencoded HTML forms)
-│   ├── login/             # Admin portal login page
-│   └── page.tsx           # Redirection to admin panel
-├── components/            # UI components (sidebar, modals, tables, metrics)
+│   │   ├── auth/          # Gestionnaires d'authentification basés sur JWT
+│   │   ├── challenge/     # Générateur de défi cryptographique Proof-of-Work
+│   │   └── submit/[id]/   # Endpoint de soumission dynamique (prend en charge JSON et HTML urlencoded)
+│   ├── login/             # Page de connexion au portail admin
+│   └── page.tsx           # Redirection vers le panneau d'administration
+├── components/            # Composants UI (barre latérale, modales, tableaux, métriques)
+├── emails/                # Modèles d'emails React Email (AutoReply, LeadNotification)
 ├── lib/
-│   ├── actions.ts         # Secure Next.js Server Actions (handling all database transactions)
-│   ├── blacklist.ts       # Ban & blacklist controls
-│   ├── dnsLookup.ts       # Reverse DNS reverse lookup VPN block
-│   ├── email.ts           # Email engine with automatic SMTP fallback rotation & templates
-│   ├── jwt.ts             # Web Crypto HMAC-SHA256 JWT sign & verify
-│   ├── pow.ts             # Cryptographic Proof-of-Work verifier
-│   └── supabase.ts        # Service role Supabase client
-├── proxy.ts               # Middleware guard (User-Agent blacklisting & admin path obfuscation)
-├── schema.sql             # Primary database tables
-└── migration_auto_reply.sql # V2 Auto-reply DB migration
+│   ├── actions.ts         # Actions Serveur Next.js (gérant toutes les transactions DB)
+│   ├── blacklist.ts       # Contrôles de bannissement et liste noire
+│   ├── dnsLookup.ts       # Blocage VPN par recherche inversée DNS
+│   ├── email.ts           # Moteur d'email avec rotation de secours SMTP
+│   ├── jwt.ts             # Signature et vérification JWT HMAC-SHA256
+│   ├── pow.ts             # Vérificateur cryptographique Proof-of-Work
+│   └── supabase.ts        # Client Supabase (Service role)
+├── proxy.ts               # Gardien Middleware (Blacklist User-Agent & obfuscation du chemin admin)
+├── schema.sql             # Tables principales de la base de données
+├── migration_auto_reply.sql # Migration DB pour l'auto-réponse
+├── migration_v2_branding.sql # Migration DB pour les logos et couleurs clients
+└── migration_v3.sql       # Migration DB (Filtre Spam, Redirections, Live Logs)
 ```
 
 ---
 
-## ⚡ SMTP Provider Setup Guide (Resend vs Brevo)
+## ⚡ Guide de Configuration du Fournisseur SMTP (Resend vs Brevo)
 
-Outlook, Gmail, and personal Microsoft 365 accounts block basic SMTP authentication (SMTP AUTH) by default to prevent spam. **App passwords will NOT work for Microsoft 365** because SMTP authentication is disabled at the entire mailbox/tenant level (`535 5.7.1 Authentication unsuccessful`, `SmtpClientAuthentication is disabled`).
+Outlook, Gmail et les comptes Microsoft 365 personnels bloquent par défaut l'authentification SMTP de base (SMTP AUTH) pour éviter le spam. **Les mots de passe d'application NE FONCTIONNERONT PAS pour Microsoft 365** car l'authentification SMTP est désactivée au niveau de la boîte mail (`535 5.7.1 Authentication unsuccessful`).
 
-You **must** switch to a dedicated transactional mail provider.
+Vous **devez** passer par un fournisseur d'emails transactionnels dédié.
 
-Because all client websites submit forms to this **centralized Next.js API**, you only configure SMTP **once** in this project's `.env.local`. Client websites do not need any credentials. The SMTP host, port, username, and API key will be exactly the same for all projects and forms.
+Puisque tous les sites web clients soumettent des formulaires à cette **API Next.js centralisée**, vous ne configurez le SMTP qu'une **seule fois** dans le fichier `.env.local` de ce projet. Les sites web clients n'ont besoin d'aucun identifiant SMTP. 
 
-**⚠️ CRITICAL WARNING:** You cannot use a `.vercel.app` or `.onrender.com` domain as your `SMTP_FROM` email (e.g. `no-reply@my-app.vercel.app`). Mail providers will reject it because you cannot verify DNS records (SPF/DKIM) for Vercel subdomains. You MUST use a custom domain you own (e.g. `contact@your-agency.com`) or use the default sandbox environments.
+**⚠️ AVERTISSEMENT CRITIQUE :** Vous ne pouvez pas utiliser un domaine `.vercel.app` comme email `SMTP_FROM` (ex: `no-reply@my-app.vercel.app`). Les fournisseurs d'emails le rejetteront car vous ne pouvez pas vérifier les enregistrements DNS (SPF/DKIM) pour les sous-domaines Vercel. Vous DEVEZ utiliser un domaine personnalisé que vous possédez (ex: `contact@votre-agence.com`).
 
-### Option A: Brevo (Best for Free Tier - 300 emails/day)
-Brevo is free for **300 emails/day** (9,000/month). It is highly recommended if you don't want to mess with domains initially, as it allows sending from single verified emails.
-*   **Will credentials vary?** No. One Brevo account handles emails for all your forms across all client websites.
+### Option A : Brevo (Meilleur pour le plan gratuit - 300 emails/jour)
+Brevo est gratuit pour **300 emails/jour**. Un seul compte Brevo gère les emails pour tous vos formulaires à travers tous les sites clients.
 
-**🚨 CRITICAL FIX FOR ERROR `525 5.7.1 Unauthorized IP address`:**
-Brevo recently added an aggressive security feature that blocks API/SMTP from unknown IP addresses. Because platforms like Vercel/Render use **dynamic IP addresses**, your emails will randomly fail with the `525 5.7.1` error.
-**To fix this:**
-1. Log into Brevo, click your profile (top right) > **Settings** > **Security**.
-2. Go to the **Authorized IPs** tab.
-3. **DEACTIVATE** "Blocking of unknown IP addresses" (or ensure your Vercel static IPs are whitelisted if on a Pro plan). If you test locally, your home IP will be blocked until you disable this!
+**🚨 CORRECTION CRITIQUE POUR L'ERREUR `525 5.7.1 Unauthorized IP address` :**
+Brevo bloque par défaut les API/SMTP provenant d'adresses IP inconnues. Vercel utilisant des **adresses IP dynamiques**, vos emails échoueront aléatoirement.
+**Pour corriger cela :**
+1. Connectez-vous à Brevo, cliquez sur votre profil (en haut à droite) > **Paramètres** > **Sécurité**.
+2. Allez dans l'onglet **IP Autorisées**.
+3. **DÉSACTIVEZ** le "Blocage des adresses IP inconnues".
 
-#### Step-by-Step Brevo Setup:
-1.  **Sign up**: Create a free account at [brevo.com](https://brevo.com).
-2.  **Add Sender**: Go to your profile menu > **Senders & IP** > **Senders** > **Add a Sender**. Enter the email you want to send from (even a Gmail works for testing, though a custom domain is better). Verify it via the confirmation email.
-3.  **Get SMTP Credentials**: Go to **SMTP & API** in the menu > **SMTP** tab. Copy your SMTP key.
-4.  **Configure `.env.local`**:
-    ```env
-    SMTP_HOST=smtp-relay.brevo.com
-    SMTP_PORT=587
-    SMTP_SECURE=false
-    SMTP_USER=your_brevo_login_email@example.com
-    SMTP_PASS=xsmtpsib-your_brevo_smtp_key_here
-    SMTP_FROM="Your Agency <your_verified_email@example.com>"
-    ```
-
----
-
-### Option B: Resend (Best Developer Experience - 3,000 emails/month)
-Resend is a premium developer-focused mailer. It is free for **100 emails/day** (3,000/month). It requires a custom domain to go to production.
-
-#### Step-by-Step Resend Setup:
-1.  **Sign up**: Create a free account at [resend.com](https://resend.com).
-2.  **Add Domain**: In the left sidebar, click **Domains** > **Add Domain**. Enter your domain name (e.g., `immopro.cm`).
-3.  **Configure DNS**: Resend will show 3 DNS records (DKIM and SPF TXT/MX records). Log into your domain registrar (GoDaddy, Cloudflare, etc.) and add these records to your DNS zone.
-4.  **Get API Key**: Go to **API Keys** > **Create API Key**. Copy the key (`re_...`).
-5.  **Configure `.env.local`**:
-    ```env
-    SMTP_HOST=smtp.resend.com
-    SMTP_PORT=587
-    SMTP_SECURE=false
-    SMTP_USER=resend
-    SMTP_PASS=re_your_api_key_here
-    SMTP_FROM="Your Agency <contact@your-domain.com>"
-    ```
-
----
-
-## 💻 Local Development Setup
-
-### 1. Database Setup (Supabase)
-Create a new project on [Supabase](https://supabase.com) and execute the SQL definitions in the SQL Editor:
-1.  Run `schema.sql` to initialize tables (`clients`, `forms`, `submissions`, `blacklist`, `refresh_tokens`).
-2.  Run `migration_auto_reply.sql` to add auto-reply fields to the `forms` table.
-
-### 2. Environment Variables Configuration
-Duplicate `.env.local.template` as `.env.local` in the root folder, and fill in the values:
+#### Configuration `.env.local` Brevo :
 ```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=votre_email_de_connexion_brevo@example.com
+SMTP_PASS=xsmtpsib-votre_cle_smtp_brevo_ici
+SMTP_FROM="Votre Agence <votre_email_verifie@example.com>"
+```
 
-# Administration
-# Generate SHA-256 hash of your admin password (e.g. for "admin123", use: 24078923b...)
-ADMIN_PASSWORD_HASH=your-sha256-hex-hash
-JWT_SECRET=any-long-secure-random-string
+### Option B : Resend (Meilleure Expérience Développeur - 3 000 emails/mois)
+Resend est gratuit pour **100 emails/jour** (3 000/mois). Il nécessite un domaine personnalisé vérifié via DNS.
 
-# SMTP Config
+#### Configuration `.env.local` Resend :
+```env
 SMTP_HOST=smtp.resend.com
 SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=resend
-SMTP_PASS=re_your_key
-SMTP_PASS_FALLBACK=re_backup_key_if_needed
-SMTP_FROM="Agency Forms <no-reply@yourdomain.com>"
+SMTP_PASS=re_votre_cle_api_ici
+SMTP_FROM="Votre Agence <contact@votre-domaine.com>"
 ```
 
-### 3. Install & Launch
+---
+
+## 💻 Configuration pour le Développement Local
+
+### 1. Configuration de la Base de Données (Supabase)
+Créez un nouveau projet sur [Supabase](https://supabase.com) et exécutez les définitions SQL dans l'Éditeur SQL :
+1.  Exécutez `schema.sql` pour initialiser les tables.
+2.  Exécutez `migration_auto_reply.sql`, `migration_v2_branding.sql` et **`migration_v3.sql`**.
+3.  **Configuration du Stockage (Storage) :** Allez dans Storage et créez un nouveau bucket nommé exactement `uploads`. Assurez-vous de le configurer en **Public**. Ceci est requis pour la gestion des pièces jointes Base64.
+
+### 2. Configuration des Variables d'Environnement
+Dupliquez `.env.local.template` en tant que `.env.local` et remplissez les valeurs :
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://votre-projet.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=votre-cle-service-role-supabase
+
+# Administration (Générez un hash SHA-256 de votre mot de passe admin)
+ADMIN_PASSWORD_HASH=votre-hash-hex-sha256
+JWT_SECRET=une-longue-chaine-aleatoire-securisee
+
+# Config SMTP
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=resend
+SMTP_PASS=re_votre_cle
+SMTP_FROM="Agence <no-reply@votredomaine.com>"
+```
+
+### 3. Installation & Lancement
 ```bash
 npm install
 npm run dev
 ```
-Open `http://localhost:3000` to access the admin panel. Use your hashed password to sign in.
+Ouvrez `http://localhost:3000` pour accéder au panneau d'administration. 
 
 ---
 
-## 🔌 Frontend Integration Guide
+## 🔌 Guide d'Intégration Frontend
 
-To submit data to a form, fetch its form ID (UUID) from the admin panel under **Forms**.
+Pour soumettre des données à un formulaire, récupérez son ID (UUID) depuis le panneau d'administration.
 
-### Option A: Standard HTML Form (No JS / Fallback)
-Useful for plain HTML pages or environments where JavaScript is disabled.
+### Option A : Formulaire HTML Standard (Sans JS / Secours)
 ```html
 <form action="http://localhost:3000/api/submit/VOTRE-UUID-DU-FORMULAIRE" method="POST">
-  <!-- Honeypot anti-spam trap (hidden from users) -->
+  <!-- Piège anti-spam Honeypot (Caché aux utilisateurs) -->
   <input type="text" name="_gotcha" style="display:none !important" tabindex="-1" autocomplete="off" />
 
-  <!-- Language field (fr/en) -->
+  <!-- Champ langue (fr/en) -->
   <input type="hidden" name="_lang" value="fr" />
-
-  <!-- Optional redirect URL (falls back to Referer site if empty) -->
-  <input type="hidden" name="redirect_url" value="https://yourwebsite.com/success" />
 
   <input type="text" name="nom" required placeholder="Nom complet" />
   <input type="email" name="email" required placeholder="Email" />
@@ -185,15 +174,15 @@ Useful for plain HTML pages or environments where JavaScript is disabled.
 </form>
 ```
 
-### Option B: AJAX POST with Proof-of-Work (Recommended)
-Required to bypass spambots on high-traffic sites using background challenge resolution.
+### Option B : Requête POST AJAX avec Preuve de Travail (Recommandé)
+Requis pour contourner les spambots sur les sites à fort trafic.
 
-1.  **Request a Cryptographic Challenge**:
+1.  **Demander un Défi Cryptographique** :
     ```js
-    const res = await fetch("http://localhost:3000/api/challenge");
+    const res = await fetch("https://votre-api.com/api/challenge");
     const { challenge, timestamp, difficulty } = await res.json();
     ```
-2.  **Solve the Challenge** in CPU background:
+2.  **Résoudre le Défi** (en tâche de fond CPU) :
     ```js
     async function sha256(str) {
       const buf = new TextEncoder().encode(str);
@@ -211,72 +200,68 @@ Required to bypass spambots on high-traffic sites using background challenge res
       nonce++;
     }
     ```
-3.  **POST Payload to Submit API**:
+3.  **POSTER la charge utile (Payload)** :
     ```js
-    const response = await fetch("http://localhost:3000/api/submit/VOTRE-UUID-DU-FORMULAIRE", {
+    const response = await fetch("https://votre-api.com/api/submit/VOTRE-UUID", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         nom: "Jean Dupont",
         email: "jean@example.com",
-        message: "Message content...",
-        _lang: "fr", // 'fr' or 'en' for auto-reply localization
-        
-        // Proof of Work parameters
+        _lang: "fr",
         pow_challenge: challenge,
         pow_timestamp: timestamp,
         pow_nonce: nonce.toString()
       })
     });
-    const result = await response.json();
     ```
 
 ---
 
-## 🛡️ Operations & Troubleshooting
+## 🛡️ Opérations & Résolution des problèmes
 
-*   **Why does the submitter not receive an auto-reply?**
-    *   Make sure `auto_reply_enabled` is checked in the form configuration panel.
-    *   Auto-replies are restricted to **3 emails per 10 minutes** per email address to prevent form flooding. If you test multiple times, you might hit this limit.
-*   **Where are blocked requests logged?**
-    *   If a request fails Honeypot or Rate Limits, the source IP/Fingerprint is appended to the `blacklist` table in your database and will reject future connections with `404 Not Found`. You can manually delete blocked rows via `/admin/blacklist`.
+*   **Pourquoi l'expéditeur ne reçoit-il pas d'accusé de réception ?**
+    *   Assurez-vous que l'auto-réponse est activée dans la configuration du formulaire.
+    *   Les accusés de réception sont limités à **3 emails par 10 minutes** par adresse email pour éviter le flooding.
+*   **Où sont enregistrées les requêtes bloquées ?**
+    *   Si une requête échoue au test du Honeypot ou aux limites de taux (Rate Limits), l'IP/Empreinte source est ajoutée à la table `blacklist` de votre base de données. Vous pouvez supprimer manuellement les lignes bloquées via `/admin/blacklist`.
 
 ---
 
-## 🏗️ V2 Architectural Decisions & Testing Guide
+## 🏗️ Guide de Test et Décisions Architecturales V3
 
-This project was recently upgraded to V2 to ensure it operates at a Senior Developer level, particularly focusing on **World-Class Error Handling**, **Dynamic Multi-Tenant Branding**, and **UI/UX Polish**.
+Ce projet a été mis à niveau pour fonctionner à un niveau de développeur senior, en se concentrant sur **une gestion des erreurs de classe mondiale**, **une image de marque multi-locataire dynamique (Multi-Tenant)** et **une expérience utilisateur (UI/UX) soignée**.
 
-### What Was Done & Why?
+### Ce qui a été fait & Pourquoi ?
 
-1. **Senior Dev-Level API Error Handling:**
-   - **What:** The `createErrorResponse` system in `app/api/submit/[id]/route.ts` was entirely refactored. Every error response now includes a specific JSON `remedy` string detailing exactly how to fix the error. The HTML fallback UI also highlights this solution.
-   - **Why:** Frontend developers integrating this API on client sites do not have access to server logs. If they configure CORS incorrectly or forget Proof-of-Work parameters, they need immediate, actionable feedback (like Stripe's API), rather than generic "Bad Request" errors.
+1. **Gestion des Erreurs API de niveau Senior :**
+   - **Quoi :** Le système `createErrorResponse` a été entièrement remanié. Chaque réponse d'erreur inclut désormais une instruction JSON `remedy` détaillée expliquant exactement comment corriger l'erreur. 
+   - **Pourquoi :** Les développeurs frontend intégrant cette API n'ont pas accès aux logs du serveur. S'ils configurent mal CORS ou oublient le Proof-of-Work, ils ont besoin d'un retour immédiat (comme l'API Stripe), plutôt que d'erreurs génériques "Bad Request".
 
-2. **React Email & Dynamic Branding:**
-   - **What:** Replaced basic string-template emails with `@react-email/components`. Added `logo_url`, `primary_color`, and `font_family` to the `clients` database schema (via `migration_v2_branding.sql`). The API dynamically injects these into `LeadNotification` and `AutoReply` emails.
-   - **Why:** To make the microservice truly multi-tenant. A form submission for "ImmoPro" looks completely different from another client's form submission. It respects each brand's artistic direction natively.
+2. **React Email & Branding Dynamique (Via l'UI) :**
+   - **Quoi :** Remplacement des templates d'emails textuels de base par `@react-email/components`. Vous pouvez désormais configurer la Direction Artistique d'un client (Couleurs, Logos, Polices) directement dans l'interface **Tableau de bord Admin > Clients**.
+   - **Pourquoi :** Pour rendre le microservice véritablement multi-locataire. Une soumission pour "ImmoPro" sera visuellement différente d'un autre client, respectant nativement la charte graphique de chaque marque.
 
-3. **Magic UI Dashboard Redesign:**
-   - **What:** Integrated `framer-motion` and Magic UI components (`BlurFade`, `ShimmerButton`, `BorderBeam`, `NumberTicker`) directly into the Admin Panel (`app/admin/page.tsx` and `[id]/page.tsx`).
-   - **Why:** To elevate the UI to a modern, premium feel. *Crucially, no new colors were introduced* to strictly preserve the existing minimalist slate/dark blue theme.
+3. **Stockage Intelligent des Pièces Jointes (Base64 vers Supabase) :**
+   - **Quoi :** Lorsque les utilisateurs envoient des photos sur les sites clients, les données sont de massives chaînes Base64. L'API décode désormais automatiquement ces images, génère des noms de fichiers contextuels (ex : `171234-king-ford.jpg`), les uploade dans le bucket Supabase `uploads`, et injecte un lien de téléchargement propre dans l'email.
+   - **Pourquoi :** Les blocs Base64 massifs déclenchent les filtres anti-spam et sont impossibles à télécharger pour les destinataires. Cela garantit une délivrabilité email parfaite et une interface propre.
 
-### How to Test the V2 Features
+4. **Refonte du Tableau de Bord avec Magic UI :**
+   - **Quoi :** Intégration de `framer-motion` et des composants Magic UI (`BlurFade`, `ShimmerButton`, `BorderBeam`, `NumberTicker`) directement dans le panneau d'administration.
+   - **Pourquoi :** Pour élever l'interface vers un design moderne et premium, sans compromettre le thème minimaliste (Slate/Bleu Foncé).
 
-1. **Test the Error Handling DX:**
-   - Attempt a `POST` request to an invalid UUID (e.g., `http://localhost:3000/api/submit/1234`).
-   - *Expected Result:* A JSON response containing a specific `remedy` like `"Check the Form ID in your fetch URL..."`.
+### Comment Tester les Nouvelles Fonctionnalités V3
 
-2. **Test React Email Branding:**
-   - In Supabase, update a client's `primary_color` (e.g., `#ef4444`) and `logo_url`. Submit a form tied to that client.
-   - *Expected Result:* The auto-reply sent to your email will feature the red accent color and the client's logo, rendered flawlessly in HTML.
+1. **Tester le Filtre Anti-Spam NLP & Les Live Logs :**
+   - Ouvrez la nouvelle page `Logs & Échecs` dans le tableau de bord Admin et activez le **"Mode Live"**.
+   - Soumettez un formulaire via votre frontend en incluant le mot "crypto" ou "seo" dans le message.
+   - *Résultat Attendu :* L'API simulera un succès pour le spammeur, mais la tentative sera interceptée et apparaîtra instantanément dans vos Live Logs, sans jamais polluer votre boîte mail.
 
-3. **Test Magic UI:**
-   - Navigate to the `/admin` dashboard. 
-   - *Expected Result:* The statistics cards will fade in sequentially (`BlurFade`), and the numbers will count up dynamically (`NumberTicker`). Open a form's details page to see the `BorderBeam` highlight the integration code on hover.
+2. **Tester les Variables Dynamiques de l'Auto-Répondeur :**
+   - Allez dans la configuration d'un formulaire, modifiez le "Message (Texte brut)" de l'auto-réponse pour inclure : `Bonjour {{name}}, bien reçu !`
+   - Soumettez le formulaire avec "Jean" dans le champ `Nom`.
+   - *Résultat Attendu :* L'expéditeur recevra un email disant "Bonjour Jean, bien reçu !".
 
-#   l o g i c i e l - f o r m u l a i r e  
- #   l o g i c i e l - f o r m u l a i r e  
- 
+3. **Tester l'Exportation CSV :**
+   - Allez dans la section `Leads` (Soumissions) d'un formulaire et cliquez sur **Exporter en CSV**.
+   - *Résultat Attendu :* Un fichier `.csv` téléchargé où toutes les propriétés JSON dynamiques ont été intelligemment aplanies en colonnes séparées (Nom, Email, Marque, Modèle, etc.).

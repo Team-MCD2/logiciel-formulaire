@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Copy, Check, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { getFormDetails, toggleFormStatus, updateFormAutoReply, updateFormOrigins } from '@/lib/actions';
+import { getFormDetails, toggleFormStatus, updateFormOrigins } from '@/lib/actions';
 import { BorderBeam } from '@/components/magicui/border-beam';
 import ShimmerButton from '@/components/magicui/shimmer-button';
 import BlurFade from '@/components/magicui/blur-fade';
@@ -25,8 +25,9 @@ interface Form {
   is_active: boolean;
   allowed_origins: string[];
   auto_reply_enabled: boolean;
-  auto_reply_subject: string;
-  auto_reply_message: string;
+  auto_reply_subject?: string;
+  auto_reply_message?: string;
+  success_url?: string;
   clients: {
     name: string;
     email: string;
@@ -45,7 +46,8 @@ export default function FormDetailsPage({ params }: { params: Promise<{ id: stri
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
   const [autoReplySubject, setAutoReplySubject] = useState('');
   const [autoReplyMessage, setAutoReplyMessage] = useState('');
-  const [updatingAutoReply, setUpdatingAutoReply] = useState(false);
+  const [successUrl, setSuccessUrl] = useState('');
+  const [updatingSettings, setUpdatingSettings] = useState(false);
 
   // CORS state
   const [corsInput, setCorsInput] = useState('');
@@ -65,6 +67,7 @@ export default function FormDetailsPage({ params }: { params: Promise<{ id: stri
         setAutoReplyEnabled(fetchedForm.auto_reply_enabled || false);
         setAutoReplySubject(fetchedForm.auto_reply_subject || 'Confirmation de réception');
         setAutoReplyMessage(fetchedForm.auto_reply_message || '');
+        setSuccessUrl(fetchedForm.success_url || '');
         setCorsInput((fetchedForm.allowed_origins || ['*']).join(', '));
       }
     } catch (err) {
@@ -89,29 +92,25 @@ export default function FormDetailsPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  const handleSaveAutoReply = async (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form) return;
 
-    setUpdatingAutoReply(true);
+    setUpdatingSettings(true);
     try {
-      const res = await updateFormAutoReply(form.id, autoReplyEnabled, autoReplySubject, autoReplyMessage);
+      const { updateFormSettings } = await import('@/lib/actions');
+      const res = await updateFormSettings(form.id, autoReplyEnabled, autoReplySubject, autoReplyMessage, successUrl);
       if (res && !res.success) {
         alert('Erreur lors de la sauvegarde: ' + res.error);
         return;
       }
-      setForm({
-        ...form,
-        auto_reply_enabled: autoReplyEnabled,
-        auto_reply_subject: autoReplySubject,
-        auto_reply_message: autoReplyMessage,
-      });
-      alert('Paramètres de réponse automatique enregistrés avec succès !');
+      setForm({ ...form, auto_reply_enabled: autoReplyEnabled, auto_reply_subject: autoReplySubject, auto_reply_message: autoReplyMessage, success_url: successUrl });
+      alert('Paramètres mis à jour avec succès !');
     } catch (err: any) {
-      console.error('Error updating auto-reply settings:', err);
+      console.error('Error updating form settings:', err);
       alert('Erreur lors de la sauvegarde: ' + (err.message || String(err)));
     } finally {
-      setUpdatingAutoReply(false);
+      setUpdatingSettings(false);
     }
   };
 
@@ -237,23 +236,41 @@ export default function FormDetailsPage({ params }: { params: Promise<{ id: stri
           {/* Auto-Reply panel */}
           <BlurFade delay={0.15}>
           <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-xs space-y-4">
-            <h3 className="font-bold text-slate-900 text-sm">Réponse Automatique</h3>
+            <h3 className="font-bold text-slate-900 text-sm">Paramètres Avancés & Auto-Réponse</h3>
             <p className="text-xs text-slate-500">
-              Envoyez un e-mail de confirmation automatique à la personne qui soumet le formulaire.
+              Configurez la page de redirection et l'email de confirmation automatique envoyé au prospect.
             </p>
-
-            <form onSubmit={handleSaveAutoReply} className="space-y-4 pt-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="detail-auto-reply" className="text-xs font-semibold text-slate-700 cursor-pointer">
-                  Activer la réponse automatique
+            
+            <form onSubmit={handleSaveSettings} className="space-y-5 pt-2">
+              <div className="space-y-1.5 border-b border-slate-50 pb-4">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  URL de redirection (Succès)
                 </label>
+                <input
+                  type="text"
+                  placeholder="Ex: https://monsite.com/merci"
+                  value={successUrl}
+                  onChange={(e) => setSuccessUrl(e.target.value)}
+                  disabled={updatingSettings}
+                  className="flex w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:opacity-50"
+                />
+                <span className="text-[9px] text-slate-400 block font-medium">
+                  Force la redirection vers cette page après soumission (remplace la configuration frontend). Laissez vide pour utiliser celle du code.
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-900">Activer l'Auto-Réponse</h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Envoie un email de confirmation à l'adresse renseignée.</p>
+                </div>
                 <input
                   id="detail-auto-reply"
                   type="checkbox"
                   checked={autoReplyEnabled}
                   onChange={(e) => setAutoReplyEnabled(e.target.checked)}
                   className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                  disabled={updatingAutoReply}
+                  disabled={updatingSettings}
                 />
               </div>
 
@@ -268,7 +285,7 @@ export default function FormDetailsPage({ params }: { params: Promise<{ id: stri
                       placeholder="Confirmation de réception"
                       value={autoReplySubject}
                       onChange={(e) => setAutoReplySubject(e.target.value)}
-                      disabled={updatingAutoReply}
+                      disabled={updatingSettings}
                       className="flex w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:opacity-50"
                       required
                     />
@@ -279,15 +296,15 @@ export default function FormDetailsPage({ params }: { params: Promise<{ id: stri
                       Message (Texte brut)
                     </label>
                     <textarea
-                      placeholder="Ex: Bonjour, nous avons bien reçu votre demande..."
+                      placeholder="Ex: Bonjour {{name}}, nous avons bien reçu votre demande..."
                       value={autoReplyMessage}
                       onChange={(e) => setAutoReplyMessage(e.target.value)}
-                      disabled={updatingAutoReply}
+                      disabled={updatingSettings}
                       rows={4}
                       className="flex w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:opacity-50"
                     />
-                    <span className="text-[9px] text-slate-400 block font-medium">
-                      Laissez vide pour utiliser le message par défaut (qui inclut le nom du client destinataire).
+                    <span className="text-[9px] text-slate-500 block font-medium">
+                      Utilisez <code className="bg-slate-100 text-slate-700 px-1 py-0.5 rounded text-[8px] font-mono">{"{{name}}"}</code> ou <code className="bg-slate-100 text-slate-700 px-1 py-0.5 rounded text-[8px] font-mono">{"{{nom}}"}</code> pour inclure dynamiquement le nom de l'expéditeur. Laissez vide pour utiliser le message par défaut.
                     </span>
                   </div>
                 </div>
@@ -295,10 +312,10 @@ export default function FormDetailsPage({ params }: { params: Promise<{ id: stri
 
               <Button
                 type="submit"
-                disabled={updatingAutoReply}
+                disabled={updatingSettings}
                 className="w-full text-xs py-2 mt-2"
               >
-                {updatingAutoReply ? 'Enregistrement...' : 'Enregistrer les paramètres'}
+                {updatingSettings ? 'Enregistrement...' : 'Enregistrer les paramètres'}
               </Button>
             </form>
           </div>

@@ -65,19 +65,27 @@ export async function getClients() {
   return data || [];
 }
 
-export async function saveClient(id: string | null, name: string, email: string, phone: string | null) {
+export async function saveClient(
+  id: string | null, 
+  name: string, 
+  email: string, 
+  phone: string | null,
+  logo_url: string | null = null,
+  primary_color: string | null = '#000000',
+  font_family: string | null = 'sans-serif'
+) {
   try {
     await verifyAdminAuth();
     if (id) {
       const { error } = await supabase
         .from('clients')
-        .update({ name, email, phone: phone || null })
+        .update({ name, email, phone: phone || null, logo_url, primary_color, font_family })
         .eq('id', id);
       if (error) throw error;
     } else {
       const { error } = await supabase
         .from('clients')
-        .insert([{ name, email, phone: phone || null }]);
+        .insert([{ name, email, phone: phone || null, logo_url, primary_color, font_family }]);
       if (error) throw error;
     }
     return { success: true };
@@ -116,7 +124,7 @@ export async function getFormDetails(formId: string) {
   const [formRes, subsRes] = await Promise.all([
     supabase
       .from('forms')
-      .select('id, name, is_active, allowed_origins, auto_reply_enabled, auto_reply_subject, auto_reply_message, clients(name, email)')
+      .select('id, name, is_active, allowed_origins, auto_reply_enabled, auto_reply_subject, auto_reply_message, success_url, clients(name, email)')
       .eq('id', formId)
       .single(),
     supabase
@@ -139,7 +147,8 @@ export async function createForm(
   allowedOrigins: string[],
   autoReplyEnabled = false,
   autoReplySubject = 'Confirmation de réception',
-  autoReplyMessage = ''
+  autoReplyMessage = '',
+  successUrl = ''
 ) {
   try {
     await verifyAdminAuth();
@@ -154,6 +163,7 @@ export async function createForm(
           auto_reply_enabled: autoReplyEnabled,
           auto_reply_subject: autoReplySubject,
           auto_reply_message: autoReplyMessage,
+          success_url: successUrl,
         },
       ]);
     if (error) throw error;
@@ -164,11 +174,12 @@ export async function createForm(
   }
 }
 
-export async function updateFormAutoReply(
+export async function updateFormSettings(
   formId: string,
   autoReplyEnabled: boolean,
   autoReplySubject: string,
-  autoReplyMessage: string
+  autoReplyMessage: string,
+  successUrl: string
 ) {
   try {
     await verifyAdminAuth();
@@ -178,6 +189,7 @@ export async function updateFormAutoReply(
         auto_reply_enabled: autoReplyEnabled,
         auto_reply_subject: autoReplySubject,
         auto_reply_message: autoReplyMessage,
+        success_url: successUrl,
       })
       .eq('id', formId);
     if (error) throw error;
@@ -278,6 +290,25 @@ export async function removeBlacklist(id: string) {
     return { success: true };
   } catch (err: any) {
     console.error('Error in removeBlacklist:', err);
+    return { success: false, error: err.message || String(err) };
+  }
+}
+
+// ==================== FAILURES LOGS ====================
+
+export async function getFailuresLogs() {
+  try {
+    await verifyAdminAuth();
+    const { data, error } = await supabase
+      .from('failures_log')
+      .select('id, form_id, error_type, error_message, payload, created_at, forms(name)')
+      .order('created_at', { ascending: false })
+      .limit(100);
+      
+    if (error) throw error;
+    return { success: true, data: data || [] };
+  } catch (err: any) {
+    console.error('Error in getFailuresLogs:', err);
     return { success: false, error: err.message || String(err) };
   }
 }

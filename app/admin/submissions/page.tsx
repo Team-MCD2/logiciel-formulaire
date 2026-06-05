@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Eye, FileText } from 'lucide-react';
+import { Eye, FileText, Download } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { getSubmissions } from '@/lib/actions';
@@ -57,6 +57,41 @@ export default function SubmissionsPage() {
     }
   }
 
+  const handleExportCSV = () => {
+    if (submissions.length === 0) return;
+    
+    const allKeys = new Set<string>();
+    submissions.forEach(sub => Object.keys(sub.payload).forEach(k => allKeys.add(k)));
+    const keysArray = Array.from(allKeys).filter(k => k !== '_gotcha');
+    
+    const headers = ['Date', 'Formulaire', 'IP', ...keysArray];
+    
+    const rows = submissions.map(sub => {
+      const date = new Date(sub.created_at).toLocaleString('fr-FR');
+      const formName = sub.forms ? sub.forms.name : 'Inconnu';
+      const ip = sub.ip_address || '';
+      
+      const payloadCols = keysArray.map(key => {
+        let val = sub.payload[key] || '';
+        val = String(val).replace(/"/g, '""');
+        // Remove newlines to keep CSV structure clean
+        val = val.replace(/\n/g, ' '); 
+        return `"${val}"`;
+      });
+      
+      return `"${date}","${formName}","${ip}",${payloadCols.join(',')}`;
+    });
+    
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `leads_${new Date().getTime()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -68,9 +103,19 @@ export default function SubmissionsPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Leads / Soumissions</h2>
-        <p className="text-sm text-slate-500">Historique complet des messages reçus via l&apos;ensemble de vos formulaires.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Leads / Soumissions</h2>
+          <p className="text-sm text-slate-500">Historique complet des messages reçus via l&apos;ensemble de vos formulaires.</p>
+        </div>
+        <Button 
+          onClick={handleExportCSV} 
+          disabled={submissions.length === 0}
+          className="flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800"
+        >
+          <Download className="w-4 h-4" />
+          Exporter en CSV
+        </Button>
       </div>
 
       {/* Leads Table */}

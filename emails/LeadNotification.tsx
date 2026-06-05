@@ -64,9 +64,19 @@ export const LeadNotificationEmail = ({
                 // Formatting keys nicely (e.g., "first_name" -> "First Name")
                 const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                 
+                const valStr = String(value);
+                const isUrl = valStr.startsWith('http') && (valStr.includes('supabase.co/storage') || valStr.includes('uploads/'));
+                
                 return (
                   <Text key={key} style={{ margin: '8px 0', color: '#333', fontSize: '15px' }}>
-                    <strong style={{ color: primaryColor }}>{formattedKey}:</strong> {String(value)}
+                    <strong style={{ color: primaryColor }}>{formattedKey}:</strong>{' '}
+                    {isUrl ? (
+                      <Link href={valStr} style={{ color: primaryColor, textDecoration: 'underline' }}>
+                        Voir / Télécharger la pièce jointe
+                      </Link>
+                    ) : (
+                      valStr
+                    )}
                   </Text>
                 );
               })}

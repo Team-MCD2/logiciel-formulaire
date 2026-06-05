@@ -157,33 +157,42 @@ export async function sendAutoReplyEmail(
   customSubject?: string,
   customMessage?: string,
   lang: string = 'fr',
-  branding?: any
+  branding?: any,
+  senderName?: string
 ): Promise<boolean> {
   const isEn = lang.toLowerCase() === 'en';
+  
+  const parseTemplate = (text: string) => {
+    if (!text) return text;
+    const nameToUse = senderName && senderName.trim() !== '' ? senderName.trim() : (isEn ? 'Client' : 'Client');
+    return text.replace(/\{\{name\}\}/gi, nameToUse).replace(/\{\{nom\}\}/gi, nameToUse);
+  };
 
   const defaultSubject = isEn
     ? `Confirmation of receipt - ${formName}`
     : `Confirmation de réception - ${formName}`;
 
   const subject = customSubject && customSubject.trim() !== '' 
-    ? customSubject.trim() 
+    ? parseTemplate(customSubject)
     : defaultSubject;
+
+  const parsedCustomMessage = customMessage ? parseTemplate(customMessage) : undefined;
 
   // Render React Email AutoReply
   const htmlContent = await render(
     React.createElement(AutoReplyEmail, {
       clientName,
       formName,
-      customMessage,
+      customMessage: parsedCustomMessage,
       branding: branding || {}
     })
   );
 
-  const textContent = customMessage && customMessage.trim() !== ''
-    ? customMessage.trim()
+  const textContent = parsedCustomMessage && parsedCustomMessage.trim() !== ''
+    ? parsedCustomMessage.trim()
     : (isEn 
-      ? `Thank you for your message, ${clientName}. We have received your request and will get back to you as soon as possible.`
-      : `Merci pour votre message, ${clientName}. Nous avons bien reçu votre demande et vous répondrons dans les meilleurs délais.`);
+      ? `Thank you for your message, ${senderName || 'Client'}. We have received your request and will get back to you as soon as possible.`
+      : `Merci pour votre message, ${senderName || 'Client'}. Nous avons bien reçu votre demande et vous répondrons dans les meilleurs délais.`);
 
   const result = await sendWithFallback({
     from: getSenderAddress(clientName),

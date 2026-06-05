@@ -63,6 +63,19 @@ function escapeHtml(text: string): string {
   });
 }
 
+async function logFailure(formId: string | null, errorType: string, errorMessage: string, payload: any = {}) {
+  try {
+    await supabase.from('failures_log').insert([{
+      form_id: formId || null,
+      error_type: errorType,
+      error_message: errorMessage,
+      payload: payload
+    }]);
+  } catch (e) {
+    console.error('[LOG FAILURE ERROR]', e);
+  }
+}
+
 /**
  * Creates a structured error response.
  * If origin is present (AJAX/Fetch request), it returns a JSON response with proper CORS headers.
@@ -239,6 +252,7 @@ export async function POST(
 
   // 1. General Blacklist Check (IP, Fingerprint, Host)
   if (await isBlacklisted(ipAddress) || (fingerprint !== 'no_fingerprint' && await isBlacklisted(fingerprint))) {
+    await logFailure(formId, 'BLACKLIST_TRIGGER', `Blocked IP/Fingerprint: ${ipAddress}`);
     return createErrorResponse(
       403,
       'SENDER_BLACKLISTED',
@@ -266,11 +280,28 @@ export async function POST(
 
   const { data: form, error: formError } = await supabase
     .from('forms')
-    .select('name, is_active, allowed_origins, notify_email, auto_reply_enabled, auto_reply_subject, auto_reply_message, client_id, clients(name, email, logo_url, primary_color, font_family)')
+    .select('name, is_active, allowed_origins, notify_email, auto_reply_enabled, auto_reply_subject, auto_reply_message, success_url, client_id, clients(name, email, logo_url, primary_color, font_family)')
     .eq('id', formId)
     .single();
 
-  if (formError || !form) {
+  if (form && form.success_url && form.success_url.trim() !== '') {
+    redirectUrl = form.success_url;
+  }
+
+  if (formError) {
+    console.error('[SUBMIT] Database query error:', formError);
+    return createErrorResponse(
+      500,
+      'DATABASE_QUERY_ERROR',
+      `A database error occurred while fetching the form: ${formError.message}`,
+      'Check your database schema. Ensure the forms and clients tables exist and contain all required columns (including recent migrations).',
+      origin,
+      isJson,
+      redirectUrl
+    );
+  }
+
+  if (!form) {
     return createErrorResponse(
       404,
       'FORM_NOT_FOUND',
@@ -368,6 +399,7 @@ export async function POST(
   // 4. Honeypot check: "_gotcha"
   // If bots fill this invisible input field, trigger active blacklisting immediately
   if (payload._gotcha !== undefined && payload._gotcha !== '') {
+    await logFailure(formId, 'HONEYPOT_TRIGGER', 'Honeypot field was filled out', payload);
     // Flag IP, Fingerprint & resolve VPN host asynchronously
     await handleHoneypotTrigger(ipAddress, fingerprint);
     
@@ -428,6 +460,78 @@ export async function POST(
   const lang = payload._lang || payload.lang || 'fr';
   delete cleanPayload._lang;
   delete cleanPayload.lang;
+
+  // 4b. Keyword Spam Filter Check
+  const SPAM_KEYWORDS = ['seo', 'crypto', 'viagra', 'enlarge', 'casino', 'bitcoin', 'investment'];
+  const payloadString = JSON.stringify(cleanPayload).toLowerCase();
+  const isSpam = SPAM_KEYWORDS.some(keyword => payloadString.includes(keyword));
+  
+  if (isSpam) {
+    await logFailure(formId, 'SPAM_KEYWORD', 'Payload contained blacklisted keywords', cleanPayload);
+    // Deceptive silent success response
+    const headers: Record<string, string> = origin ? { 'Access-Control-Allow-Origin': origin } : {};
+    if (isJson || origin) {
+      return NextResponse.json({ success: true, message: 'Submission logged successfully' }, { headers });
+    } else {
+      if (redirectUrl.startsWith('file://') || redirectUrl.startsWith('chrome-error://')) {
+        return new NextResponse('<p>Success</p>', { headers: { 'Content-Type': 'text/html' } });
+      }
+      return NextResponse.redirect(new URL(`${redirectUrl}?submitted=true`, request.url), 303);
+    }
+  }
+
+  // Process Base64 attachments (upload to Supabase Storage)
+  const sanitizeForFilename = (str: string) => str.replace(/[^a-zA-Z0-9-]/g, '_').toLowerCase().substring(0, 30);
+  
+  const nomKey = Object.keys(cleanPayload).find(k => k.toLowerCase() === 'nom' || k.toLowerCase() === 'name');
+  const marqueKey = Object.keys(cleanPayload).find(k => k.toLowerCase() === 'marque' || k.toLowerCase() === 'brand');
+  const modeleKey = Object.keys(cleanPayload).find(k => k.toLowerCase() === 'modele' || k.toLowerCase() === 'model');
+
+  const nom = nomKey ? sanitizeForFilename(cleanPayload[nomKey]) : 'user';
+  const marque = marqueKey ? sanitizeForFilename(cleanPayload[marqueKey]) : '';
+  const modele = modeleKey ? sanitizeForFilename(cleanPayload[modeleKey]) : '';
+  const baseNameParts = [nom, marque, modele].filter(Boolean);
+  const baseName = baseNameParts.length > 0 ? baseNameParts.join('-') : 'upload';
+
+  for (const [key, value] of Object.entries(cleanPayload)) {
+    if (typeof value === 'string' && value.startsWith('data:')) {
+      const match = value.match(/^data:(.*?);base64,(.*)$/);
+      if (match) {
+        const mimeType = match[1];
+        const base64Data = match[2];
+        
+        let ext = 'bin';
+        if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = 'jpg';
+        else if (mimeType.includes('png')) ext = 'png';
+        else if (mimeType.includes('pdf')) ext = 'pdf';
+        else if (mimeType.includes('webp')) ext = 'webp';
+
+        const filename = `${Date.now()}-${baseName}-${sanitizeForFilename(key)}.${ext}`;
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        try {
+          const { data, error } = await supabase.storage
+            .from('uploads')
+            .upload(filename, buffer, {
+              contentType: mimeType,
+              upsert: true
+            });
+            
+          if (!error && data) {
+            const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(filename);
+            if (urlData && urlData.publicUrl) {
+              cleanPayload[key] = urlData.publicUrl;
+              console.log(`[SUBMIT] Successfully uploaded ${filename}`);
+            }
+          } else {
+            console.error('[SUBMIT] Supabase storage upload error:', error);
+          }
+        } catch (uploadErr) {
+          console.error('[SUBMIT] Buffer upload exception:', uploadErr);
+        }
+      }
+    }
+  }
 
   // 5. Proof-of-Work (PoW) verification for AJAX requests
   // Safe fallback if not AJAX (no CORS headers / normal Form submission)
@@ -518,6 +622,7 @@ export async function POST(
       // Asynchronously send SMTP email
       sendLeadEmail(clientEmail, form.name, cleanPayload, ipAddress, clientName, branding).catch(err => {
         console.error('SMTP Background error:', err);
+        logFailure(formId, 'SMTP_FAILED', `Failed to send lead email: ${err.message || err}`, cleanPayload);
       });
     }
   }
@@ -538,6 +643,9 @@ export async function POST(
         font_family: clientObj.font_family,
       } : {};
 
+      const senderNameKey = Object.keys(cleanPayload).find(k => k.toLowerCase() === 'nom' || k.toLowerCase() === 'name');
+      const senderName = senderNameKey ? String(cleanPayload[senderNameKey]).trim() : undefined;
+
       // Apply anti-reply rate limit for auto-replies
       if (checkAutoReplyRateLimit(emailToSubmit)) {
         sendAutoReplyEmail(
@@ -547,9 +655,11 @@ export async function POST(
           form.auto_reply_subject || undefined,
           form.auto_reply_message || undefined,
           lang,
-          branding
+          branding,
+          senderName
         ).catch(err => {
           console.error('Auto-reply background error:', err);
+          logFailure(formId, 'SMTP_AUTOREPLY_FAILED', `Failed to send auto-reply to ${emailToSubmit}: ${err.message || err}`, cleanPayload);
         });
       } else {
         console.warn(`[AUTOREPLY] Rate limit exceeded for email: ${emailToSubmit}. Skipping auto-reply.`);
